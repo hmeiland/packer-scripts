@@ -1,0 +1,119 @@
+{
+    "builders": [
+        {
+            "type": "azure-arm",
+  
+            "subscription_id": "{{user `var_subscription_id`}}",
+            "tenant_id": "{{user `var_tenant_id`}}",
+            "client_id": "{{user `var_client_id`}}",
+            "client_secret": "{{user `var_client_secret`}}",
+  
+			"image_publisher": "OpenLogic",
+			"image_offer": "CentOS",
+			"image_sku": "7.7",
+
+            "managed_image_resource_group_name": "{{user `var_resource_group`}}",
+            "managed_image_name": "{{user `image`}}",
+
+            "os_type": "Linux",
+            "vm_size":  "Standard_NC6",
+            "ssh_pty": "true",
+  
+            "build_resource_group_name": "{{user `var_resource_group`}}"
+        }
+    ],
+    "provisioners": [
+	{
+            "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+            "inline": [
+                "echo 'installing latest kernel'",
+                "sudo yum install -y kernel kernel-tools kernel-headers kernel-devel",
+                "sudo reboot"
+            ],
+            "inline_shebang": "/bin/bash -e",
+            "type": "shell",
+            "skip_clean": true,
+            "expect_disconnect": true,
+            "pause_before": "30s"
+        },
+	{
+            "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+            "inline": [
+                "echo 'installing latest LIS'",
+                "wget https://aka.ms/lis",
+                "tar xvzf lis",
+                "cd LISISO",
+                "sudo ./install.sh",
+                "sudo reboot"
+            ],
+            "inline_shebang": "/bin/bash -e",
+            "type": "shell",
+            "skip_clean": true,
+            "expect_disconnect": true,
+            "pause_before": "30s"
+        },
+	{
+            "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+            "inline": [
+                "echo 'installing latest gpu drivers'",
+                "sudo rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm",
+                "sudo yum install -y dkms",
+                "CUDA_REPO_PKG=cuda-repo-rhel7-10.0.130-1.x86_64.rpm",
+                "wget http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/${CUDA_REPO_PKG} -O /tmp/${CUDA_REPO_PKG}",
+                "sudo rpm -ivh /tmp/${CUDA_REPO_PKG}",
+                "rm -f /tmp/${CUDA_REPO_PKG}",
+                "sudo yum install -y cuda-drivers cuda",
+                "sudo reboot"
+            ],
+            "inline_shebang": "/bin/bash -e",
+            "type": "shell",
+            "skip_clean": true,
+            "expect_disconnect": true,
+            "pause_before": "30s"
+        },
+	{
+            "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+            "inline": [
+                "echo 'installing rdma pieces'",
+                "sed -i -e 's/# OS.EnableRDMA=y/OS.EnableRDMA=y/g' /etc/waagent.conf",
+                "systemctl enable waagent",
+                "systemctl disable wpa_supplicant",
+                "systemctl disable abrtd",
+                "systemctl disable firewalld",
+                "cat << EOF >> /etc/security/limits.conf",
+                "*               hard    memlock         unlimited",
+                "*               soft    memlock         unlimited",
+                "*               soft    nofile          65535",
+                "*               hard    nofile          65535",
+                "EOF",
+                "echo 'vm.zone_reclaim_mode = 1' >> /etc/sysctl.conf",
+                "sysctl -p",
+                "wget http://content.mellanox.com/ofed/MLNX_OFED-4.7-1.0.0.1/MLNX_OFED_LINUX-4.7-1.0.0.1-rhel7.7-x86_64.tgz",
+                "tar zxvf MLNX_OFED_LINUX-4.7-1.0.0.1-rhel7.7-x86_64.tgz",
+                "KERNEL=( $(rpm -q kernel | sed 's/kernel\\-//g') )",
+                "KERNEL=${KERNEL[-1]}",
+                "yum install -y kernel-devel-${KERNEL} python-devel redhat-rpm-config rpm-build yum install tcl gcc-gfortran tk",
+                "./MLNX_OFED_LINUX-4.7-1.0.0.1-rhel7.7-x86_64/mlnxofedinstall --kernel $KERNEL --kernel-sources /usr/src/kernels/${KERNEL} --add-kernel-support --skip-repo",
+                "reboot"
+            ],
+            "inline_shebang": "/bin/bash -e",
+            "type": "shell",
+            "skip_clean": true,
+            "expect_disconnect": true,
+            "pause_before": "30s"
+        },
+	{
+            "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+            "inline": [
+                "echo 'cleaning up after reboot'",
+                "/usr/sbin/waagent -force -deprovision+user && export HISTSIZE=0 && sync"
+            ],
+            "inline_shebang": "/bin/bash -e",
+            "type": "shell",
+            "expect_disconnect": true,
+            "skip_clean": true,
+            "pause_before": "30s"
+        }
+    ]
+}
+  

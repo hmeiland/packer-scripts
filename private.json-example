@@ -1,0 +1,8 @@
+{
+             "var_subscription_id": "<subscription id>",
+             "var_tenant_id": "<tenant id>",
+             "var_client_id": "<application id>",
+             "var_client_secret": "<application secret>",
+             "var_resource_group": "<resource group name>"
+}
+
