@@ -1,0 +1,63 @@
+{
+    "builders": [
+        {
+            "type": "azure-arm",
+  
+            "subscription_id": "{{user `var_subscription_id`}}",
+            "tenant_id": "{{user `var_tenant_id`}}",
+            "client_id": "{{user `var_client_id`}}",
+            "client_secret": "{{user `var_client_secret`}}",
+  
+			"image_publisher": "OpenLogic",
+			"image_offer": "CentOS",
+			"image_sku": "7.7",
+
+            "managed_image_resource_group_name": "{{user `var_resource_group`}}",
+            "managed_image_name": "{{user `image`}}",
+
+            "os_type": "Linux",
+            "vm_size":  "Standard_NC6",
+            "ssh_pty": "true",
+  
+            "build_resource_group_name": "{{user `var_resource_group`}}"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "file",
+            "source": "jetpack-7.9.1-linux.tar.gz",
+            "destination": "/tmp/jetpack-linux.tar.gz"
+        },
+	{
+            "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+            "inline": [
+                "echo 'installing jetpack'",
+                "tar zxvf /tmp/jetpack-linux.tar.gz",
+                "cd jetpack",
+                "./install.sh",
+                "sed -i \"s@jetpack converge@jetpack converge --mode=install@\" /opt/cycle/jetpack/system/bin/cyclecloud-bootstrap.sh",
+                "yum install -y ntp policycoreutils-python nfs-utils samba samba-client epel-release",
+                "yum install -y fail2ban ganglia-gmetad ganglia-gmond ganglia-gmond-python",
+                "sync && reboot"
+            ],
+            "inline_shebang": "/bin/bash -e",
+            "type": "shell",
+            "skip_clean": true,
+            "expect_disconnect": true,
+            "pause_before": "30s"
+        },
+	{
+            "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+            "inline": [
+                "echo 'cleaning up after reboot'",
+                "/usr/sbin/waagent -force -deprovision+user && export HISTSIZE=0 && sync"
+            ],
+            "inline_shebang": "/bin/bash -e",
+            "type": "shell",
+            "expect_disconnect": true,
+            "skip_clean": true,
+            "pause_before": "30s"
+        }
+    ]
+}
+  
